@@ -16,6 +16,11 @@ public class Main {
                 break;
             }
 
+            if (command.equals("pwd")) {
+                System.out.println(System.getProperty("user.dir"));
+                continue;
+            }
+
             if (command.startsWith("echo ")) {
                 System.out.println(command.substring(5));
                 continue;
@@ -24,7 +29,7 @@ public class Main {
             if (command.startsWith("type ")) {
                 String cmd = command.substring(5);
 
-                if (cmd.equals("echo") || cmd.equals("exit") || cmd.equals("type")) {
+                if (cmd.equals("echo") || cmd.equals("exit") || cmd.equals("type") || cmd.equals("pwd")) {
                     System.out.println(cmd + " is a shell builtin");
                     continue;
                 }
@@ -70,7 +75,6 @@ public class Main {
 
             if (executable != null) {
                 ProcessBuilder pb = new ProcessBuilder(Arrays.asList(parts));
-                pb.command(Arrays.asList(parts));
                 pb.inheritIO();
 
                 Process process = pb.start();

@@ -2,9 +2,6 @@ import java.util.Scanner;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 
 public class Main {
 
@@ -68,6 +65,23 @@ public class Main {
         }
         res.cleanedArgs = cleaned.toArray(new String[0]);
         return res;
+    }
+
+    private static void touchRedirectionFiles(RedirectionResult red) throws IOException {
+        if (red.outputFile != null) {
+            File f = new File(red.outputFile);
+            if (f.getParentFile() != null) f.getParentFile().mkdirs();
+            if (!red.appendOutput || !f.exists()) {
+                try (FileOutputStream fos = new FileOutputStream(f, red.appendOutput)) {}
+            }
+        }
+        if (red.errorFile != null) {
+            File f = new File(red.errorFile);
+            if (f.getParentFile() != null) f.getParentFile().mkdirs();
+            if (!red.appendError || !f.exists()) {
+                try (FileOutputStream fos = new FileOutputStream(f, red.appendError)) {}
+            }
+        }
     }
 
     private static void flushTransfer(InputStream in, OutputStream out) throws IOException {
@@ -145,7 +159,6 @@ public class Main {
         List<BackgroundJob> backgroundJobs = new ArrayList<>();
 
         while (true) {
-            // --- Automatic Reaping Before Prompt ---
             for (BackgroundJob job : backgroundJobs) {
                 if (job.status.equals("Running") && !job.process.isAlive()) job.status = "Done";
             }
@@ -189,6 +202,9 @@ public class Main {
 
                 RedirectionResult red1 = parseRedirections(parts1);
                 RedirectionResult red2 = parseRedirections(parts2);
+
+                touchRedirectionFiles(red1);
+                touchRedirectionFiles(red2);
 
                 PipedOutputStream pipeOut = new PipedOutputStream();
                 PipedInputStream pipeIn = new PipedInputStream(pipeOut);
@@ -269,6 +285,7 @@ public class Main {
 
             // --- Single Command Path ---
             RedirectionResult red = parseRedirections(parts);
+            touchRedirectionFiles(red); // Ensure files exist immediately
             parts = red.cleanedArgs;
             String cmd = parts[0];
 
@@ -301,14 +318,12 @@ public class Main {
             if (executable != null) {
                 ProcessBuilder pb = new ProcessBuilder(parts).directory(currentDirectory);
                 
-                // Fixed Standard Output Redirection
                 if (red.outputFile != null) {
                     pb.redirectOutput(red.appendOutput ? ProcessBuilder.Redirect.appendTo(new File(red.outputFile)) : ProcessBuilder.Redirect.to(new File(red.outputFile)));
                 } else {
                     pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
                 }
                 
-                // FIXED: Handle Standard Error Redirection cleanly (2> and 2>>)
                 if (red.errorFile != null) {
                     pb.redirectError(red.appendError ? ProcessBuilder.Redirect.appendTo(new File(red.errorFile)) : ProcessBuilder.Redirect.to(new File(red.errorFile)));
                 } else {

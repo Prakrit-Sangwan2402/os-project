@@ -100,13 +100,11 @@ public class Main {
                 out.println(exec != null ? targetCmd + " is " + exec.getAbsolutePath() : targetCmd + ": not found");
             }
         } else if (cmd.equals("jobs")) {
-            // Reap right before formatting output buffer
             for (BackgroundJob job : backgroundJobs) {
                 if (job.status.equals("Running") && !job.process.isAlive()) {
                     job.status = "Done";
                 }
             }
-            
             int numJobs = backgroundJobs.size();
             for (int i = 0; i < numJobs; i++) {
                 BackgroundJob job = backgroundJobs.get(i);
@@ -285,7 +283,6 @@ public class Main {
             }
 
             if (isBuiltIn(cmd)) {
-                // Give OS structures a brief moment to update status before evaluating the 'jobs' state explicitly
                 if (cmd.equals("jobs")) {
                     Thread.sleep(30); 
                 }
@@ -303,12 +300,20 @@ public class Main {
             File executable = findExecutable(cmd);
             if (executable != null) {
                 ProcessBuilder pb = new ProcessBuilder(parts).directory(currentDirectory);
+                
+                // Fixed Standard Output Redirection
                 if (red.outputFile != null) {
                     pb.redirectOutput(red.appendOutput ? ProcessBuilder.Redirect.appendTo(new File(red.outputFile)) : ProcessBuilder.Redirect.to(new File(red.outputFile)));
                 } else {
                     pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
                 }
-                pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+                
+                // FIXED: Handle Standard Error Redirection cleanly (2> and 2>>)
+                if (red.errorFile != null) {
+                    pb.redirectError(red.appendError ? ProcessBuilder.Redirect.appendTo(new File(red.errorFile)) : ProcessBuilder.Redirect.to(new File(red.errorFile)));
+                } else {
+                    pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+                }
 
                 Process process = pb.start();
                 if (runInBackground) {

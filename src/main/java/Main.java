@@ -70,7 +70,16 @@ public class Main {
         return res;
     }
 
-    // Helper to execute built-in commands writing to an explicit PrintStream and reading from an InputStream
+    // Explicitly flushes the stream after every chunk to prevent tail -f from blocking
+    private static void flushTransfer(InputStream in, OutputStream out) throws IOException {
+        byte[] buffer = new byte[1024];
+        int bytesRead;
+        while ((bytesRead = in.read(buffer)) != -1) {
+            out.write(buffer, 0, bytesRead);
+            out.flush();
+        }
+    }
+
     private static void executeBuiltIn(String[] parts, InputStream in, PrintStream out, File currentDirectory, List<BackgroundJob> backgroundJobs) throws Exception {
         String cmd = parts[0];
         if (cmd.equals("pwd")) {
@@ -117,7 +126,7 @@ public class Main {
             } else if (!inSingleQuotes && !inDoubleQuotes && c == '\\') {
                 if (i + 1 < input.length()) { current.append(input.charAt(i + 1)); i++; }
             } else if (c == '\'' && !inDoubleQuotes) { inSingleQuotes = !inSingleQuotes;
-            } else if (c == '"' && !inSingleQuotes) { inDoubleQuotes = !inDoubleQuotes;
+            } else if (c == '"' && !inSingleQuotes) { inDoubleQuotes = !inSingleQuotes;
             } else if (Character.isWhitespace(c) && !inSingleQuotes && !inDoubleQuotes) {
                 if (current.length() > 0) { args.add(current.toString()); current.setLength(0); }
             } else { current.append(c); }
@@ -198,14 +207,13 @@ public class Main {
                             pb1.redirectOutput(ProcessBuilder.Redirect.PIPE);
                             Process p1 = pb1.start();
 
-                            // Pump process stdout into the pipeline
                             try (InputStream procOut = p1.getInputStream()) {
-                                procOut.transferTo(outStream);
+                                flushTransfer(procOut, outStream);
                             }
                             p1.waitFor();
                         }
                     } catch (Exception e) {
-                        // Handle broken pipe gracefully silently
+                        // Quiet exit
                     }
                 });
 
@@ -236,9 +244,8 @@ public class Main {
 
                             Process p2 = pb2.start();
 
-                            // Feed the pipeline data into process stdin
                             try (OutputStream procIn = p2.getOutputStream()) {
-                                pipeIn.transferTo(procIn);
+                                flushTransfer(pipeIn, procIn);
                             }
                             p2.waitFor();
                         }

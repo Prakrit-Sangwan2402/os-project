@@ -159,6 +159,10 @@ public class Main {
         List<BackgroundJob> backgroundJobs = new ArrayList<>();
 
         while (true) {
+            // Give OS a deterministic window to clean process descriptors before printing prompt
+            Thread.sleep(40);
+
+            // --- Automatic Reaping Before Prompt ---
             for (BackgroundJob job : backgroundJobs) {
                 if (job.status.equals("Running") && !job.process.isAlive()) job.status = "Done";
             }
@@ -285,7 +289,7 @@ public class Main {
 
             // --- Single Command Path ---
             RedirectionResult red = parseRedirections(parts);
-            touchRedirectionFiles(red); // Ensure files exist immediately
+            touchRedirectionFiles(red);
             parts = red.cleanedArgs;
             String cmd = parts[0];
 
@@ -300,9 +304,6 @@ public class Main {
             }
 
             if (isBuiltIn(cmd)) {
-                if (cmd.equals("jobs")) {
-                    Thread.sleep(30); 
-                }
                 PrintStream out = System.out;
                 if (red.outputFile != null) out = new PrintStream(new FileOutputStream(red.outputFile, red.appendOutput), true);
                 executeBuiltIn(parts, System.in, out, currentDirectory, backgroundJobs);

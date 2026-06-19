@@ -70,7 +70,6 @@ public class Main {
         return res;
     }
 
-    // Explicitly flushes the stream after every chunk to prevent tail -f from blocking
     private static void flushTransfer(InputStream in, OutputStream out) throws IOException {
         byte[] buffer = new byte[1024];
         int bytesRead;
@@ -101,6 +100,13 @@ public class Main {
                 out.println(exec != null ? targetCmd + " is " + exec.getAbsolutePath() : targetCmd + ": not found");
             }
         } else if (cmd.equals("jobs")) {
+            // Reap right before formatting output buffer
+            for (BackgroundJob job : backgroundJobs) {
+                if (job.status.equals("Running") && !job.process.isAlive()) {
+                    job.status = "Done";
+                }
+            }
+            
             int numJobs = backgroundJobs.size();
             for (int i = 0; i < numJobs; i++) {
                 BackgroundJob job = backgroundJobs.get(i);
@@ -126,7 +132,7 @@ public class Main {
             } else if (!inSingleQuotes && !inDoubleQuotes && c == '\\') {
                 if (i + 1 < input.length()) { current.append(input.charAt(i + 1)); i++; }
             } else if (c == '\'' && !inDoubleQuotes) { inSingleQuotes = !inSingleQuotes;
-            } else if (c == '"' && !inSingleQuotes) { inDoubleQuotes = !inSingleQuotes;
+            } else if (c == '"' && !inSingleQuotes) { inDoubleQuotes = !inDoubleQuotes;
             } else if (Character.isWhitespace(c) && !inSingleQuotes && !inDoubleQuotes) {
                 if (current.length() > 0) { args.add(current.toString()); current.setLength(0); }
             } else { current.append(c); }
@@ -141,7 +147,7 @@ public class Main {
         List<BackgroundJob> backgroundJobs = new ArrayList<>();
 
         while (true) {
-            // --- Automatic Reaping ---
+            // --- Automatic Reaping Before Prompt ---
             for (BackgroundJob job : backgroundJobs) {
                 if (job.status.equals("Running") && !job.process.isAlive()) job.status = "Done";
             }
@@ -191,7 +197,6 @@ public class Main {
 
                 File currentDirFinal = currentDirectory;
 
-                // STAGE 1 THREAD
                 Thread stage1Thread = new Thread(() -> {
                     try (PrintStream outStream = new PrintStream(pipeOut, true)) {
                         if (isBuiltIn(red1.cleanedArgs[0])) {
@@ -217,7 +222,6 @@ public class Main {
                     }
                 });
 
-                // STAGE 2 THREAD
                 Thread stage2Thread = new Thread(() -> {
                     try {
                         PrintStream destinationOut = System.out;
@@ -281,10 +285,18 @@ public class Main {
             }
 
             if (isBuiltIn(cmd)) {
+                // Give OS structures a brief moment to update status before evaluating the 'jobs' state explicitly
+                if (cmd.equals("jobs")) {
+                    Thread.sleep(30); 
+                }
                 PrintStream out = System.out;
                 if (red.outputFile != null) out = new PrintStream(new FileOutputStream(red.outputFile, red.appendOutput), true);
                 executeBuiltIn(parts, System.in, out, currentDirectory, backgroundJobs);
                 if (red.outputFile != null) out.close();
+                
+                if (cmd.equals("jobs")) {
+                    backgroundJobs.removeIf(job -> job.status.equals("Done"));
+                }
                 continue;
             }
 

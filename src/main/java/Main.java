@@ -5,11 +5,14 @@ public class Main {
         Scanner scanner = new Scanner(System.in);
 
         while (true) {
-            // TODO: Uncomment the code below to pass the first stage
             System.out.print("$ ");
             System.out.flush();
 
             String command = scanner.nextLine();
+
+            if (command.equals("exit")) {
+                break;
+            }
 
             System.out.println(command + ": command not found");
         }

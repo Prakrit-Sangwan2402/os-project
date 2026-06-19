@@ -79,6 +79,20 @@ public class Main {
                 continue;
             }
 
+            boolean runInBackground = false;
+            if (parts[parts.length - 1].equals("&")) {
+                runInBackground = true;
+                
+                // Remove the '&' token from the arguments
+                String[] newParts = new String[parts.length - 1];
+                System.arraycopy(parts, 0, newParts, 0, parts.length - 1);
+                parts = newParts;
+            }
+
+            if (parts.length == 0) {
+                continue;
+            }
+
             String outputFile = null;
             String errorFile = null;
             boolean appendOutput = false;
@@ -372,7 +386,13 @@ public class Main {
                 }
 
                 Process process = pb.start();
-                process.waitFor();
+                
+                if (runInBackground) {
+                    System.out.printf("[%d] %d%n", 1, process.pid());
+                } else {
+                    process.waitFor();
+                }
+
             } else {
                 String err = command + ": command not found";
 
